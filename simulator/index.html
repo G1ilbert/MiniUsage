@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>LCD Simulator</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=block" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+      color: #ccc;
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem;
+      gap: 1.5rem;
+    }
+    canvas#lcd {
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      width: 480px;
+      height: 480px;
+      background: #000;
+      border: 1px solid #333;
+      border-radius: 6px;
+    }
+    .controls {
+      display: grid;
+      grid-template-columns: 130px 1fr 90px;
+      gap: 10px 16px;
+      width: 480px;
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+      font-size: 12px;
+      align-items: center;
+    }
+    .controls input[type=range] { width: 100%; accent-color: #97C459; }
+    .controls .v { text-align: right; color: #97C459; }
+    .controls label { color: #aaa; }
+  </style>
+</head>
+<body>
+  <canvas id="lcd" width="240" height="240"></canvas>
+
+  <div class="controls">
+    <label for="sess-pct">session %</label>
+    <input id="sess-pct" type="range" min="0" max="100" value="65">
+    <span id="sess-pct-v" class="v">65%</span>
+
+    <label for="week-pct">weekly %</label>
+    <input id="week-pct" type="range" min="0" max="100" value="42">
+    <span id="week-pct-v" class="v">42%</span>
+
+    <label for="sess-reset">session reset</label>
+    <input id="sess-reset" type="range" min="0" max="18000" value="3600">
+    <span id="sess-reset-v" class="v"></span>
+
+    <label for="week-reset">weekly reset</label>
+    <input id="week-reset" type="range" min="0" max="604800" value="172800">
+    <span id="week-reset-v" class="v"></span>
+  </div>
+
+  <script type="module">
+    import { ANIMATIONS } from './animations.js';
+
+    const canvas = document.getElementById('lcd');
+    const ctx = canvas.getContext('2d');
+    ctx.textBaseline = 'top';
+    ctx.imageSmoothingEnabled = false;
+
+    // ----- 20x20 off-screen for Clawd, drawn at 5x onto main canvas -----
+    const off = document.createElement('canvas');
+    off.width = 20; off.height = 20;
+    const octx = off.getContext('2d');
+    const offImg = octx.createImageData(20, 20);
+
+    function paintFrame(palette, frame) {
+      const d = offImg.data;
+      for (let i = 0; i < 400; i++) {
+        const idx = frame[i];
+        const c = palette[idx];
+        d[i*4    ] = ((c >> 11) & 0x1F) * 255 / 31 | 0;
+        d[i*4 + 1] = ((c >>  5) & 0x3F) * 255 / 63 | 0;
+        d[i*4 + 2] = ( c        & 0x1F) * 255 / 31 | 0;
+        d[i*4 + 3] = idx === 0 ? 0 : 255;
+      }
+      octx.putImageData(offImg, 0, 0);
+    }
+
+    // ----- helpers -----
+    function pickAnimation(p) {
+      if (p >= 100) return 'expression_sleep';
+      if (p >=  90) return 'expression_surprise';
+      if (p >=  70) return 'work_coding';
+      if (p >=  40) return 'work_think';
+      return 'idle_breathe';
+    }
+
+    function barColor(p) {
+      if (p >= 100) return '#E24B4A';
+      if (p >=  90) return '#EF9F27';
+      if (p >=  70) return '#FAC775';
+      return '#97C459';
+    }
+
+    function fmtClock() {
+      const d = new Date();
+      return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    }
+
+    function fmtReset(s) {
+      if (!s || s <= 0) return '';
+      if (s < 60)    return `resets in ${Math.round(s)}s`;
+      const m  = Math.floor(s / 60);
+      if (m < 60)    return `resets in ${m}m`;
+      const h  = Math.floor(m / 60), mm = m % 60;
+      if (h < 24)    return mm ? `resets in ${h}h ${mm}m` : `resets in ${h}h`;
+      const dd = Math.floor(h / 24), hh = h % 24;
+      return hh ? `resets in ${dd}d ${hh}h` : `resets in ${dd}d`;
+    }
+
+    // ----- safe zone (drawing assumes ctx.translate(SAFE, SAFE) is active) -----
+    const SAFE = 8;
+    const W = 240 - SAFE * 2; // 224
+    const H = 240 - SAFE * 2; // 224
+
+    // ----- panel drawing (coords relative to safe area) -----
+    function drawPanel(yTop, label, pct, resetSec, isSession) {
+      ctx.font = '8px "Press Start 2P", monospace';
+      ctx.fillStyle = '#E6F1FB';
+      ctx.textAlign = 'left';
+      ctx.fillText(label, 0, yTop);
+
+      if (isSession && pct === 0) {
+        ctx.fillStyle = '#7a8290';
+        ctx.fillText('waiting for work', 0, yTop + 20);
+        return;
+      }
+
+      const barX = 0, barY = yTop + 13, barW = W, barH = 8;
+      ctx.fillStyle = '#1f2937';
+      ctx.fillRect(barX, barY, barW, barH);
+
+      const fillW = Math.max(0, Math.min(barW, barW * pct / 100));
+      ctx.fillStyle = barColor(pct);
+      ctx.fillRect(barX, barY, fillW, barH);
+
+      const statusY = yTop + 28;
+      if (pct >= 100) {
+        ctx.fillStyle = '#E24B4A';
+        ctx.fillText('LIMIT REACHED', 0, statusY);
+      } else {
+        ctx.fillStyle = '#E6F1FB';
+        ctx.fillText(`${pct}%`, 0, statusY);
+        const txt = fmtReset(resetSec);
+        if (txt) {
+          ctx.fillStyle = '#7a8290';
+          ctx.textAlign = 'right';
+          ctx.fillText(txt, W, statusY);
+        }
+      }
+    }
+
+    // ----- main loop -----
+    let curName = pickAnimation(+document.getElementById('sess-pct').value);
+    let curFrame = 0;
+    let lastFrameAt = performance.now();
+
+    function tick(now) {
+      const sessPct   = +document.getElementById('sess-pct').value;
+      const weekPct   = +document.getElementById('week-pct').value;
+      const sessReset = +document.getElementById('sess-reset').value;
+      const weekReset = +document.getElementById('week-reset').value;
+
+      const target = pickAnimation(sessPct);
+      if (target !== curName) {
+        curName = target;
+        curFrame = 0;
+        lastFrameAt = now;
+      }
+
+      const anim = ANIMATIONS[curName];
+      if (now - lastFrameAt > anim.holds[curFrame]) {
+        curFrame = (curFrame + 1) % anim.frames.length;
+        lastFrameAt = now;
+      }
+
+      // background — full 240x240 (no safe zone on the background fill)
+      ctx.fillStyle = '#111827';
+      ctx.fillRect(0, 0, 240, 240);
+
+      // shift origin into safe zone — all drawing below uses relative coords (0..W, 0..H)
+      ctx.save();
+      ctx.translate(SAFE, SAFE);
+
+      // header — top of safe area
+      ctx.font = '10px "Press Start 2P", monospace';
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#E6F1FB';
+      ctx.fillText('Pro', 0, 0);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#C0DD97';
+      ctx.fillText(fmtClock(), W, 0);
+
+      // Clawd 20x20 @ 5x => 100x100, centered in safe area horizontally
+      paintFrame(anim.palette, anim.frames[curFrame]);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(off, (W - 100) / 2, 17, 100, 100);
+
+      // panels
+      drawPanel(120, 'Current session', sessPct, sessReset, true);
+      drawPanel(172, 'Weekly limits',   weekPct, weekReset, false);
+
+      ctx.restore();
+      requestAnimationFrame(tick);
+    }
+
+    // ----- slider live labels -----
+    function fmtSecsLabel(s) {
+      if (s <      60) return `${s}s`;
+      if (s <    3600) return `${Math.round(s/60)}m`;
+      if (s <   86400) return `${(s/3600).toFixed(1)}h`;
+      return `${(s/86400).toFixed(1)}d`;
+    }
+
+    const sliders = [
+      ['sess-pct',   v => `${v}%`],
+      ['week-pct',   v => `${v}%`],
+      ['sess-reset', v => fmtSecsLabel(+v)],
+      ['week-reset', v => fmtSecsLabel(+v)],
+    ];
+    for (const [id, fmt] of sliders) {
+      const input = document.getElementById(id);
+      const out = document.getElementById(id + '-v');
+      const update = () => { out.textContent = fmt(input.value); };
+      input.addEventListener('input', update);
+      update();
+    }
+
+    // start after font is ready (avoids fallback flicker)
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => requestAnimationFrame(tick));
+    } else {
+      requestAnimationFrame(tick);
+    }
+  </script>
+</body>
+</html>

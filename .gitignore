@@ -1,0 +1,62 @@
+# ===== Big SDK / toolchain (download separately, see README) =====
+ESP8266_NONOS_SDK/
+toolchain/
+toolchain.zip
+sdk.zip
+lib/
+json/
+
+# Root-level SDK header copies (use ones from SDK download)
+/airkiss.h
+/at_custom.h
+/c_types.h
+/eagle_soc.h
+/espconn.h
+/espnow.h
+/ets_sys.h
+/gpio.h
+/ip_addr.h
+/mem.h
+/os_type.h
+/osapi.h
+/patch_array.h
+/ping.h
+/pwm.h
+/queue.h
+/simple_pair.h
+/smartconfig.h
+/sntp.h
+/spi_flash.h
+/upgrade.h
+/user_interface.h
+/version.h
+/wpa2_enterprise.h
+
+# ===== Build artifacts =====
+# Firmware
+firmware/*.o
+firmware/*.elf
+firmware/*.bin
+firmware/main.elf-*
+
+# Rust proxy
+proxy/target/
+proxy/Cargo.lock
+
+# ===== Credentials & secrets (NEVER commit) =====
+firmware/user_config.h
+*.credentials.json
+.credentials.json
+*.env
+.env
+.env.*
+
+# ===== OS / editor cruft =====
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+*.log
