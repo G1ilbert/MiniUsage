@@ -34,12 +34,12 @@
 - **SmallTV Ultra** (จาก GeekMagic) — ESP-12F + ST7789 240×240 ในตัวเดียว
 - **CH340G USB-to-Serial** สำหรับ flash firmware
 
-![SmallTV Ultra placeholder](docs/smalltv-ultra.jpg)
+<img src="docs/smalltv.jpg" width="160" alt="Preview placeholder"> <img src="docs/smalltvback.jpg" width="160" alt="Preview placeholder">
 
 ### CH340 PCB (แกะมาเอง)
 ผมแกะ CH340 PCB ที่ซื้อมาเพื่อต่อสาย flash โดยตรงกับ SmallTV Ultra
 
-![CH340 PCB placeholder](docs/ch340-pcb.jpg)
+<img src="docs/IMG20260521180547.jpg" width="160" alt="Preview placeholder"> <img src="docs/IMG20260523171345.jpg" width="160" alt="Preview placeholder">
 
 ### Pin mapping ของ SmallTV Ultra
 
