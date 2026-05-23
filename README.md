@@ -56,7 +56,7 @@
 - **GPIO0 → GND** ก่อน reset → เข้า flash mode
 - หลัง flash เสร็จ ถอด GPIO0 ออกจาก GND แล้ว reset → ทำงานปกติ
 
-![Flash wiring placeholder](docs/flash-wiring.jpg)
+<img src="docs/IMG20260522125733.jpg" width="200" alt="Preview placeholder">
 
 ---
 
