@@ -3,7 +3,7 @@
 จอแสดง usage ของ Claude Code subscription แบบ real-time
 บนฮาร์ดแวร์ ESP8266 (ESP-12F) + ST7789 1.54" 240×240 IPS
 
-![Preview placeholder — แทนที่ด้วยรูปจอจริงตอนใช้งาน](docs/preview.jpg)
+<img src="docs/preview.png" width="300" alt="Preview placeholder">
 
 ---
 
