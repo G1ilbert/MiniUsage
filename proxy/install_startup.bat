@@ -1,21 +1,43 @@
 @echo off
 setlocal
+
 set STARTUP=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup
-set TARGET=%STARTUP%\claude-proxy.bat
+set TARGET=%STARTUP%\claude-proxy.vbs
+set OLD_TARGET=%STARTUP%\claude-proxy.bat
 set PROXY_DIR=%~dp0
 
-rem Write a Startup bat that explicitly cd's to the proxy folder.
-rem (Copying start.bat as-is would break because its %~dp0 would resolve
-rem  to the Startup folder, not the proxy folder.)
-(
-    echo @echo off
-    echo cd /d "%PROXY_DIR:~0,-1%"
-    echo if not exist target\release\claude-proxy.exe ^(
-    echo     cargo build --release 2^>nul
-    echo ^)
-    echo start /min "" target\release\claude-proxy.exe
-) > "%TARGET%"
+rem Strip trailing backslash from PROXY_DIR
+set PROXY_DIR=%PROXY_DIR:~0,-1%
+set EXE=%PROXY_DIR%\target\release\claude-proxy.exe
 
-echo Installed: %TARGET%
-echo Pointing at proxy folder: %PROXY_DIR%
+rem === Build the proxy first if release binary does not exist ===
+if not exist "%EXE%" (
+    echo Release binary not found. Building...
+    pushd "%PROXY_DIR%"
+    cargo build --release
+    popd
+    if not exist "%EXE%" (
+        echo ERROR: build failed.
+        pause
+        exit /b 1
+    )
+)
+
+rem === Remove any old .bat launcher from previous install ===
+if exist "%OLD_TARGET%" del "%OLD_TARGET%"
+
+rem === Write a VBS that launches the exe completely hidden (window style 0) ===
+> "%TARGET%" echo Set objShell = CreateObject("WScript.Shell")
+>>"%TARGET%" echo objShell.Run """%EXE%""", 0, False
+>>"%TARGET%" echo Set objShell = Nothing
+
+echo.
+echo Installed VBS launcher: %TARGET%
+echo Proxy exe:              %EXE%
+echo.
+echo The proxy will start COMPLETELY HIDDEN (no window) on next login.
+echo Test now without rebooting:
+echo   wscript "%TARGET%"
+echo   curl http://localhost:8765/usage
+echo.
 pause
